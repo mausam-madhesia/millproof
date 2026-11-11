@@ -12,9 +12,9 @@ Why an app and not just Claude: Claude forgets after the chat. MillProof keeps a
 
 | | |
 |---|---|
-| Live app | `https://<your-app>.onrender.com` ← replace after deploying |
+| Live app | `https://millproof.onrender.com` |
 | Test login | `qa@millproof.demo` / `MillProof@2026` |
-| MCP link | `https://<your-app>.onrender.com/mcp?token=<MCP_TOKEN>` (the full link is shown on the app's **Connect Claude** page after login) |
+| MCP link | `https://millproof.onrender.com/mcp?token=<MCP_TOKEN>` (token sent privately with the submission; also shown on the app's **Connect Claude** page after login) |
 
 The first load after 15 idle minutes takes about a minute, because Render's free tier sleeps.
 
