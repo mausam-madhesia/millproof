@@ -1,0 +1,31 @@
+{
+  "name": "millproof",
+  "version": "1.0.0",
+  "description": "MillProof: mill test certificate (MTC) checking for Indian steel buyers. Claude reads the certificate; MillProof checks it with fixed rules, keeps the audit trail, and shares verification links.",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsc -p tsconfig.json && node --env-file-if-exists=.env dist/server.js",
+    "seed": "node --env-file-if-exists=.env dist/seed-cli.js",
+    "smoke": "node --env-file-if-exists=.env dist/smoke-test.js",
+    "check:no-ai": "node scripts/check-no-ai.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "better-sqlite3": "^12.4.1",
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.2"
+  }
+}
