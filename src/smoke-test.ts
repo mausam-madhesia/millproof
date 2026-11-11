@@ -34,14 +34,17 @@ const created = await client.callTool({
 const c = json(created);
 expect(!created.isError && c.verdict === "PASS", `create_certificate -> ${c.id} verdict ${c.verdict}`);
 expect(typeof c.record_url === "string" && c.record_url.includes(`/certificates/${c.id}`), `record link returned: ${c.record_url}`);
+expect(c.payment_status === "Awaiting QA", `create_certificate returns payment_status: ${c.payment_status}`);
 
 const listed = json(await client.callTool({ name: "list_certificates", arguments: { supplier: "smoke test" } }));
 expect(listed.some((r: { id: string }) => r.id === c.id), `list_certificates (supplier filter) finds ${c.id}`);
+expect(listed.every((r: { payment_status?: string }) => typeof r.payment_status === "string"), "list_certificates rows include payment_status");
 const failing = json(await client.callTool({ name: "list_certificates", arguments: { verdict: "FAIL" } }));
 expect(failing.every((r: { verdict: string }) => r.verdict === "FAIL"), `list_certificates (verdict=FAIL) returns ${failing.length} FAIL record(s) only`);
 
 const got = json(await client.callTool({ name: "get_certificate", arguments: { id: c.id } }));
 expect(got.id === c.id && got.results.length > 5, `get_certificate by id returns ${got.results.length} checked fields`);
+expect(got.payment_status === "Awaiting QA", "get_certificate includes payment_status");
 const byHeat = json(await client.callTool({ name: "get_certificate", arguments: { id: heat } }));
 expect(byHeat.id === c.id, "get_certificate by heat number works");
 
@@ -50,17 +53,23 @@ const s = upd.results.find((r: { field: string }) => r.field === "chemistry.S");
 expect(upd.verdict === "FAIL" && s.status === "fail", `update_certificate_field S=0.052 re-ran the check -> ${upd.verdict}`);
 const back = json(await client.callTool({ name: "update_certificate_field", arguments: { id: c.id, field: "chemistry.S", value: 0.024 } }));
 expect(back.verdict === "PASS", `update back to 0.024 -> ${back.verdict}`);
+const same = json(await client.callTool({ name: "update_certificate_field", arguments: { id: c.id, field: "chemistry.S", value: 0.024 } }));
+expect(same.verdict === "PASS" && Array.isArray(same.results), "update with an unchanged value returns fresh results");
 const miss = json(await client.callTool({ name: "update_certificate_field", arguments: { id: c.id, field: "mechanical.elongation_pct", value: null } }));
 expect(miss.verdict === "INCOMPLETE", `clearing elongation -> ${miss.verdict}`);
 
 const sc = json(await client.callTool({ name: "supplier_scorecard", arguments: { supplier: "Smoke Test" } }));
 expect(sc.total >= 1 && typeof sc.passRate === "number", `supplier_scorecard -> ${sc.total} cert(s), pass rate ${(sc.passRate * 100).toFixed(0)}%`);
+expect(!!sc.payment && sc.certificates.every((x: { payment_status?: string }) => typeof x.payment_status === "string"), "supplier_scorecard includes payment status counts and per-certificate payment_status");
 
 const bad = await client.callTool({ name: "create_certificate", arguments: { supplier: "X", heat_number: "Y", standard: "EN 10025", grade: "S355JR", chemistry: {}, mechanical: {} } });
 expect(!!bad.isError, "unsupported grade is refused with a helpful error");
 
 const share = await fetch(c.share_url);
-expect(share.status === 200 && (await share.text()).includes(heat), `share link opens without login (${share.status})`);
+const shareHtml = await share.text();
+expect(share.status === 200 && shareHtml.includes(heat) && shareHtml.includes("Change history"), `share link opens without login, with change history (${share.status})`);
+const health = await fetch(`${base}/health`);
+expect(health.status === 200 && (await health.json()).ok === true, `/health answers (${health.status})`);
 const noTok = await fetch(`${base}/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
 expect(noTok.status === 401, `MCP without token is refused (${noTok.status})`);
 

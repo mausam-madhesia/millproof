@@ -4,7 +4,7 @@ Total: 5:00. Spoken lines are written for about 140 words a minute. **[On screen
 
 ## Before you hit record
 
-- [ ] Log in to the live app **as admin**, click **Connect Claude → Reset demo data** (you get exactly 6 sample records), then log out and log back in as `qa@millproof.demo` for the recording.
+- [ ] Log in to the live app **as admin**, click **Connect Claude → Reset demo data** (you get exactly 7 sample records), then log out and log back in as `qa@millproof.demo` for the recording.
 - [ ] Stay logged in to the app in one browser tab. Open a **private/incognito window** for the share link.
 - [ ] In Claude, connect the MillProof connector and turn it on. Start a **fresh chat**.
 - [ ] Have `sample/SAMPLE_MTC_RK24-3561_photo.jpg` ready to drag in.
@@ -46,9 +46,10 @@ Total: 5:00. Spoken lines are written for about 140 words a minute. **[On screen
 | **2:50** | Claude's reply shows **PASS** and the record link. Click the link. | "MillProof checked it with fixed rules and says PASS. Let's open the record." |
 | **3:00** | App: record page. Point at the heat number, the *via Claude* tag, the Limit and Source columns, and *Carbon equivalent (calculated) 0.328*. | "Every value has its limit and the clause it comes from. MillProof also recalculates carbon equivalent from the chemistry: 0.328 against 0.33 reported, so the certificate is internally consistent." |
 | **3:20** | **The edit.** Click the **Sulphur** value `0.024`, type `0.052`, press Enter. The row flashes, the badge turns **Fail**, the verdict at the top flips **PASS → FAIL**, and the audit trail shows `0.024 → 0.052`. | "Now say our own lab retests a plate and sulphur comes back at 0.052. I correct it right here. The check re-runs instantly: sulphur fails against the 0.045 limit, the verdict flips to FAIL, and the change is on the audit trail with my name." |
-| **3:40** | Show **Approve** is disabled. Type the note `Lab retest: S 0.052, above 0.045 limit` and click **Reject batch**. | "Approve is locked because a value fails. I reject the batch with a note." |
+| **3:40** | Show **Approve** is disabled. Type the note `Lab retest: S 0.052, above 0.045 limit` and click **Reject batch**. The badge turns **Payment on hold**; click **View debit note** for two seconds. | "Approve is locked because a value fails. I reject the batch, and payment goes on hold automatically, with a debit note for the supplier already drafted. This is where QA meets finance." |
 | **3:50** | Click **Copy** next to the share link, paste it into the incognito window. | "This is the link I'd send to the client or a third-party inspector. Read-only, no login, showing the verdict and the decision." |
 | **4:00** | Back in the app: **Suppliers**. Vardhan Steel Traders now shows **67%** (it was 100%). | "And the supplier scorecard updates. Vardhan just dropped from 100 to 67 percent. Over months, this is how a buyer sees which suppliers to trust." |
+| *(optional, if time)* | Dashboard → open the **Mahalaxmi Steel Stockists** record (heat RK24-3318). | "This one passes every limit, but the same heat was already delivered by another supplier with different chemistry. One heat has one chemistry, so one certificate is wrong." |
 | *(optional, if time)* | In Claude: *"What's Vardhan Steel Traders' pass rate?"* → **supplier_scorecard**. | "The same history is available inside Claude." |
 
 **Prompt to type in Claude:**
@@ -67,7 +68,7 @@ If Claude misreads a value, **keep rolling**. Correct it in the app on camera: "
 
 > The money. MillProof runs no AI, because the customer's own Claude does the reading. My cost per customer is just hosting: about fifty rupees a month once I have a hundred customers.
 >
-> Pricing: twenty rupees a certificate pay-as-you-go, or ₹4,999 a month for a site with three seats and 400 certificates. I estimate a manual check costs about a hundred rupees of an engineer's time.
+> Pricing: ₹1,999 a month for one site and a hundred certificates, or ₹4,999 for three sites and unlimited certificates. I estimate a manual check costs about a hundred rupees of an engineer's time, so Starter pays for itself at twenty certificates.
 >
 > My first 100 customers come from steel trader associations, where every trader sends verification links to their buyers; from fabricators in industrial clusters; from IIT Bombay alumni in EPC firms as design partners; and from direct LinkedIn outreach to QA heads.
 >

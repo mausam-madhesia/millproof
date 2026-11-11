@@ -12,13 +12,13 @@ npm run dev                   # builds, then starts on http://localhost:3000
 ```
 
 - Open http://localhost:3000 and log in with `qa@millproof.demo` / `MillProof@2026`.
-- On first start the 6 sample certificates load automatically into a local SQLite file at `./data/millproof.db`.
+- On first start the 7 sample certificates load automatically into a local SQLite file at `./data/millproof.db`.
 - Reset the sample data at any time with `npm run seed -- --reset`, or (logged in as admin) the **Reset demo data** button on the Connect Claude page.
 
 ### Unit tests for the rules engine
 
 ```bash
-npm test                     # expected: "# pass 39" and "# fail 0"
+npm test                     # expected: "# pass 49" and "# fail 0"
 ```
 
 ### Admin account
@@ -92,6 +92,10 @@ Render's free web services have an **ephemeral filesystem**: a local SQLite file
    `https://millproof-xxxx.onrender.com/mcp?token=<MCP_TOKEN>`
    (You can also find the token in Render: web service → **Environment** → `MCP_TOKEN` → reveal.)
 
+**Database:** the Blueprint creates a free Render Postgres database and connects it through `DATABASE_URL`, so records survive restarts and redeploys. The startup log line `[db] using Postgres (DATABASE_URL)` confirms it. Render's free Postgres expires 30 days after creation; upgrade it (Basic, $6/month) or create a new one before then.
+
+On every start, MillProof re-checks every stored certificate against the current spec table (log line `[recheck] …`), so a spec-table change takes effect on old records too. A changed verdict is written to the audit trail, and an approval that no longer passes goes back to QA.
+
 **Environment variables (set by the Blueprint)**
 
 | Key | Value | Notes |
@@ -100,6 +104,7 @@ Render's free web services have an **ephemeral filesystem**: a local SQLite file
 | `MCP_TOKEN` | generated | The access key in the MCP link |
 | `SESSION_SECRET` | generated | Signs the login cookie |
 | `DEMO_USER` / `DEMO_PASSWORD` / `DEMO_NAME` | `qa@millproof.demo` / `MillProof@2026` / `Demo QA Engineer` | The test login |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | `admin@millproof.demo` / generated | Admin login (delete records, reset demo data) |
 | `NODE_VERSION` | `22` | |
 | `NODE_ENV` | `production` | |
 | `RENDER_EXTERNAL_URL` | set by Render | Used for record and share links, no action needed |
@@ -117,6 +122,22 @@ BASE_URL=https://millproof-xxxx.onrender.com MCP_TOKEN=<token> npm run smoke
 ```
 After that, log in as admin and click **Reset demo data** on the Connect Claude page so the smoke-test record doesn't show up in your video.
 
+## 2b. Keep it awake (no 50-second cold start)
+
+Render's free web service sleeps after 15 minutes without traffic, and the next visitor waits about a minute. MillProof has a lightweight `GET /health` endpoint (no database query) for an uptime monitor to hit.
+
+**Free option: UptimeRobot, every 5 minutes**
+1. Go to https://uptimerobot.com and sign up (free plan).
+2. Click **+ New monitor**.
+3. **Monitor type:** HTTP(s). **URL:** `https://millproof.onrender.com/health`. **Friendly name:** MillProof.
+4. **Monitoring interval:** 5 minutes (the free-plan default).
+5. Leave alerting on your email, then click **Create monitor**. It should show **Up** within a minute.
+
+The monitor pings every 5 minutes, inside Render's 15-minute idle window, so the service never sleeps. One always-on free service uses about 720 of Render's 750 free instance hours a month, so it fits, but only for one service.
+
+**Paid option: Render Starter ($7/month)**
+Web service → **Settings → Instance type → Starter**. Starter never spins down, so no monitor is needed. Pick this once real customers use the app. For a review lasting a week or two, the free monitor is enough.
+
 ## 3. Connect the live app to Claude
 
 1. In Claude (claude.ai or the desktop app), open **Settings → Connectors**.
@@ -129,6 +150,6 @@ After that, log in as admin and click **Reset demo data** on the Connect Claude 
 
 **Troubleshooting**
 
-- *"Couldn't connect" in Claude:* open `https://…onrender.com/healthz` first to wake the service (free tier sleeps), then retry. Check the URL includes `?token=`.
+- *"Couldn't connect" in Claude:* open `https://…onrender.com/health` first to wake the service (free tier sleeps), then retry. Check the URL includes `?token=`.
 - *401 in the logs:* the token in the URL doesn't match `MCP_TOKEN`. Copy the link again from the Connect Claude page.
 - *Your Claude client drops query strings:* use the path form instead: `https://…onrender.com/mcp/<MCP_TOKEN>`. Both forms work.

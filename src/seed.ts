@@ -1,4 +1,5 @@
-// Six sample certificates across three suppliers: a mix of pass, fail and missing values.
+// Seven sample certificates across four suppliers: a mix of pass, fail and missing values, plus one
+// certificate that reuses another's heat number with different chemistry (duplicate-heat red flag).
 // All company names are fictitious.
 
 import { createCertificate, decide } from "./repo.js";
@@ -59,6 +60,18 @@ const SAMPLES: { input: Record<string, unknown>; created: string; decision?: { d
     },
   },
   {
+    // Duplicate-heat demo: same mill and heat number as RK24-3318 (Vardhan, 14 Oct), different supplier and different chemistry.
+    // Every value passes the spec, but one heat has one chemistry, so MillProof raises a red flag.
+    created: "2026-11-08T10:20:00+05:30",
+    input: {
+      supplier: "Mahalaxmi Steel Stockists", mill_name: "Ravikiran Rolling Mills (fictitious)", heat_number: "RK24-3318",
+      standard: "IS 2062:2011", grade: "E250BR", certificate_no: "RRM/TC/26-27/03912", cert_date: "2026-10-09",
+      product: "HR plate 12 x 2000 x 6300 mm", thickness_mm: 12, elongation_gauge: "proportional",
+      chemistry: { C: 0.2, Mn: 0.94, Si: 0.24, S: 0.029, P: 0.031, CE: 0.37, Cr: 0.02, Ni: 0.01, Cu: 0.03, Mo: 0.005, V: 0.002, Nb: 0.002, Ti: 0.002 },
+      mechanical: { yield_strength_mpa: 312, tensile_strength_mpa: 461, elongation_pct: 26 },
+    },
+  },
+  {
     created: "2026-11-09T17:15:00+05:30",
     input: {
       supplier: "Vardhan Steel Traders", mill_name: "Ravikiran Rolling Mills (fictitious)", heat_number: "RK24-3407",
@@ -69,6 +82,9 @@ const SAMPLES: { input: Record<string, unknown>; created: string; decision?: { d
     },
   },
 ];
+
+export const SAMPLE_COUNT = SAMPLES.length;
+export const SAMPLE_HEATS = SAMPLES.map((s) => `${s.input.supplier}|${s.input.heat_number}`);
 
 export async function seed(): Promise<void> {
   for (const s of SAMPLES) {

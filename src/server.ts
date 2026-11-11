@@ -9,7 +9,7 @@ import { requireMcpToken } from "./auth.js";
 import { buildMcpServer } from "./mcp.js";
 import { webRouter } from "./web/routes.js";
 import { getDb } from "./db.js";
-import { countCertificates } from "./repo.js";
+import { countCertificates, recheckAll } from "./repo.js";
 import { seed } from "./seed.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,13 @@ const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
+// Lightweight liveness endpoint for uptime monitors (keeps the free Render instance awake). No DB query.
+const started = Date.now();
+const health = (_req: express.Request, res: express.Response) => {
+  res.set("Cache-Control", "no-store").json({ ok: true, service: "millproof", uptime_s: Math.round((Date.now() - started) / 1000) });
+};
+app.get(["/health", "/healthz"], health);
+app.head(["/health", "/healthz"], (_req, res) => res.status(200).end());
 app.use("/static", express.static(path.resolve(here, "..", "public"), { maxAge: "1h" }));
 
 // ---- MCP (Streamable HTTP, stateless) ----
@@ -55,10 +61,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 async function main() {
   await getDb();
-  if (config.seedOnEmpty && (await countCertificates()) === 0) {
+  if (config.seedOnEmpty && (await countCertificates(true)) === 0) {
     await seed();
-    console.log("[seed] database was empty, loaded 6 sample certificates");
+    console.log("[seed] database was empty, loaded the sample certificates");
   }
+  const rc = await recheckAll();
+  console.log(`[recheck] ${rc.checked} certificate(s) re-checked against the current spec table: ${rc.updated} updated, ${rc.verdictChanged} verdict change(s), ${rc.decisionsReset} approval(s) sent back to QA`);
   app.listen(config.port, () => {
     console.log(`MillProof running at ${config.publicUrl}`);
     console.log(`MCP endpoint:        ${config.publicUrl}/mcp?token=<MCP_TOKEN>`);

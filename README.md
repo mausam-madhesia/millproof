@@ -31,7 +31,9 @@ The first load after 15 idle minutes takes about a minute, because Render's free
 - **MCP tools:** `create_certificate`, `list_certificates`, `get_certificate`, `update_certificate_field`, `supplier_scorecard`.
 - **Spec table:** `spec/specs.json` covers IS 2062 E250 (A, BR), E350 and ASTM A36 plates. Every limit names its standard and clause. Limits the author isn't fully sure of are marked `"verify": true` and show a *verify* tag in the app.
 - **Rules engine:** `src/checker.ts`, with unit tests in `src/tests/` (`npm test`). Each field gets pass, fail, missing or review (a value that can't be compared, e.g. elongation on the wrong gauge length), and the certificate gets an overall verdict of PASS, FAIL or INCOMPLETE. Limits depend on thickness (IS 2062: below 20 mm, 20–40 mm inclusive, over 40 mm), and ASTM A36 phosphorus and sulphur limits depend on the edition printed (A36-19 or later vs A36-14 or earlier). CE is calculated; if it differs from the reported CE by more than 0.02, the higher value is judged. The checker also raises red flags: yield ≥ tensile, a reported CE that doesn't match the chemistry, and a heat number already seen with different chemistry.
-- **Storage:** SQLite on a laptop, Postgres on Render (same code).
+- **QA → payment:** approve → *Cleared for payment*; reject → *Payment on hold* plus a printable debit-note draft (supplier, cert no., heat, each failed value vs limit and spec clause). A **Finance** page exports everything as CSV.
+- **Audit trail:** every edit, approval, rejection, re-check and delete with who, when, field, old → new and reason. The public share page shows it read-only as **Change history** (roles, not names).
+- **Storage:** SQLite on a laptop, Postgres on Render (same code). Every record is re-checked against the spec table on startup.
 - **No AI:** `npm run check:no-ai` scans the code and every installed package for AI SDKs, hosts and keys.
 
 All company names in the sample data and the sample certificate are fictitious.

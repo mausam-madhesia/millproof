@@ -18,13 +18,13 @@ The customer's own Claude plan pays for reading the certificate. MillProof does 
 
 ## Pricing (INR)
 
-| Plan | Price | For |
+| Plan | Price (excl. GST) | For |
 |---|---|---|
-| Pay-as-you-go | **₹20 per certificate**, 1 seat | Traders, small fabricators |
-| Site | **₹4,999 / month**: 3 QA seats, 400 certificates, ₹12 per extra certificate | Fabrication shops, EPC project sites |
-| Enterprise | **from ₹24,999 / month**: unlimited seats, multiple sites, custom spec tables, ERP export | EPC contractors, large stockists |
+| Starter | **₹1,999 / month**: 1 site, 100 certificates a month | Traders, small fabricators |
+| Pro | **₹4,999 / month**: 3 sites, unlimited certificates, debit-note drafts | Fabrication shops, EPC project sites |
+| Enterprise | **Custom**: unlimited sites, custom spec tables, ERP export, SSO | EPC contractors, large stockists |
 
-**Value anchor (*assumption*):** about 15 minutes of QA engineer time per manual check at a loaded cost of about ₹400 an hour is **≈ ₹100 per certificate**, before counting the cost of accepting a wrong heat. MillProof costs ₹12–20 per certificate.
+**Value anchor (*assumption*):** about 15 minutes of QA engineer time per manual check at a loaded cost of about ₹400 an hour is **≈ ₹100 per certificate**, before counting the cost of paying for a heat that fails. Starter works out to ≈ ₹20 per certificate at full use; Pro gets cheaper with volume.
 
 **Gross margin at 100 customers (*assumption*):** about ₹49 cost against a blended ≈ ₹5,000 ARPU is **≈ 99%**.
 

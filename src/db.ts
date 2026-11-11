@@ -58,6 +58,8 @@ async function openPg(url: string): Promise<Db> {
   const wantSsl = process.env.PGSSL ? process.env.PGSSL === "true" : host.includes(".") && !/^(localhost|127\.0\.0\.1)$/.test(host);
   const pool = new pg.Pool({ connectionString: url, ssl: wantSsl ? { rejectUnauthorized: false } : false, max: 5 });
   await pool.query(SCHEMA_COMMON + EVENTS_PG);
+  // v1.1: free-text reason for a change, kept separately from MillProof's own note.
+  await pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS reason TEXT");
   const make = (runner: pg.Pool | pg.PoolClient): Db => {
     const q = (sql: string, params: unknown[] = []) => runner.query(toPg(sql), params as unknown[]);
     return {
@@ -91,6 +93,8 @@ function openSqlite(file: string): Db {
   const db = new Database(file);
   db.pragma("journal_mode = WAL");
   db.exec(SCHEMA_COMMON + EVENTS_SQLITE);
+  const cols = db.prepare("PRAGMA table_info(events)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "reason")) db.exec("ALTER TABLE events ADD COLUMN reason TEXT");
   const self: Db = {
     dialect: "sqlite",
     async all(sql, params = []) { return db.prepare(sql).all(...params) as never[]; },

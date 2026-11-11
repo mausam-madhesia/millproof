@@ -2,7 +2,7 @@ import express, { Router, Request, Response } from "express";
 import { checkCredentials, clearSession, currentUser, displayName, isAdmin, requireAdmin, requireLogin, setSession } from "../auth.js";
 import { config } from "../config.js";
 import { getValue, labelFor } from "../fields.js";
-import { allScorecards, decide, deleteCertificate, resetAll, getByShareToken, getCertificate, getEvents, listCertificates, supplierScorecard, updateField } from "../repo.js";
+import { allScorecards, decide, deleteCertificate, recheckAll, resetAll, getByShareToken, getCertificate, getEvents, listCertificates, supplierScorecard, updateField } from "../repo.js";
 import { Verdict } from "../checker.js";
 import * as V from "./views.js";
 import { seed } from "../seed.js";
@@ -38,10 +38,16 @@ export function webRouter(): Router {
     if (!c) return res.status(404).send(V.notFoundPage(null, "Verification record"));
     const events = await getEvents(c.id);
     res.setHeader("X-Robots-Tag", "noindex");
-    res.send(V.sharePage(c, events.filter((e) => e.action === "field_updated").length));
+    res.send(V.sharePage(c, events));
   });
 
-  // Everything below needs the test login.
+  // "/" is the public landing page for visitors; logged-in users get the dashboard.
+  r.get("/", (req, res, next) => {
+    if (currentUser(req)) return next();
+    res.send(V.landingPage());
+  });
+
+  // Everything below needs a login.
   r.use(requireLogin);
   const user = (req: Request) => currentUser(req)!;
 
@@ -55,9 +61,30 @@ export function webRouter(): Router {
 
   r.get("/certificates/:id", async (req, res) => {
     const c = await getCertificate(req.params.id);
-    if (!c) return res.status(404).send(V.notFoundPage(user(req), "Certificate"));
+    if (!c || (c.status === "deleted" && !isAdmin(user(req)))) return res.status(404).send(V.notFoundPage(user(req), "Certificate"));
     if (c.id !== req.params.id) return res.redirect(`/certificates/${c.id}`);
     res.send(V.layout(`Heat ${c.data.heat_number}`, V.recordPage(c, await getEvents(c.id), isAdmin(user(req))), { user: user(req), active: "certs", scripts: ["/static/record.js"] }));
+  });
+
+  // Debit-note draft for a rejected batch: printable page, or a downloadable .html file.
+  r.get("/certificates/:id/debit-note", async (req, res) => {
+    const c = await getCertificate(String(req.params.id));
+    if (!c || c.id !== String(req.params.id).toUpperCase() || c.status === "deleted") return res.status(404).send(V.notFoundPage(user(req), "Certificate"));
+    if (c.status !== "rejected") return res.status(409).send(V.layout("No debit note", `<div class="card"><div class="empty"><h2 style="color:var(--ink)">No debit note for this batch</h2><p>A debit-note draft is generated when QA rejects a batch. This one is ${c.status === "approved" ? "approved (cleared for payment)" : "awaiting QA"}.</p><a class="btn" href="/certificates/${c.id}">Back to the record</a></div></div>`, { user: user(req) }));
+    if (req.query.download) {
+      res.setHeader("Content-Disposition", `attachment; filename="debit-note-${c.data.heat_number.replace(/[^A-Za-z0-9_-]/g, "_")}-${c.id}.html"`);
+      return res.type("html").send(V.debitNotePage(c, true));
+    }
+    res.send(V.debitNotePage(c));
+  });
+
+  r.get("/finance", async (req, res) => {
+    res.send(V.layout("Finance export", V.financePage(await listCertificates({ limit: 500 })), { user: user(req), active: "finance" }));
+  });
+  r.get("/finance/export.csv", async (_req, res) => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Disposition", `attachment; filename="millproof-finance-${stamp}.csv"`);
+    res.type("text/csv; charset=utf-8").send(V.financeCsv(await listCertificates({ limit: 500 })));
   });
 
   r.get("/suppliers", async (req, res) => {
@@ -73,27 +100,28 @@ export function webRouter(): Router {
     res.send(V.layout("Connect Claude", V.connectPage(isAdmin(user(req))), { user: user(req), active: "connect" }));
   });
 
-  // Wipe and reload the 6 sample certificates (handy between demo takes; Render's free tier has no shell).
+  // Wipe and reload exactly the sample set (handy between demo takes; Render's free tier has no shell).
   r.post("/admin/reset-demo", requireAdmin, async (_req, res) => {
     await resetAll();
     await seed();
+    await recheckAll(); // cross-record checks (duplicate heats) need every sample present
     res.redirect("/");
   });
 
-  // Admin only: permanently delete one record (e.g. test data) and its audit trail.
+  // Admin only: delete one record (e.g. test data). Hidden everywhere; the audit trail records who, when and why.
   r.post("/certificates/:id/delete", requireAdmin, async (req, res) => {
-    await deleteCertificate(String(req.params.id));
+    await deleteCertificate(String(req.params.id), displayName(user(req)), str(req.body?.reason) ?? null);
     res.redirect("/");
   });
 
   // JSON API used by the record page.
   r.post("/api/certificates/:id/fields", express.json(), async (req: Request, res: Response) => {
     try {
-      const { field, value } = req.body ?? {};
-      const { cert, changed, before } = await updateField(String(req.params.id), String(field), value, displayName(user(req)));
+      const { field, value, reason } = req.body ?? {};
+      const { cert, changed, before } = await updateField(String(req.params.id), String(field), value, displayName(user(req)), str(reason) ?? null);
       const after = cert.check.verdict;
       const message = !changed
-        ? "No change"
+        ? `No change. Re-checked: ${after}.`
         : before !== after
           ? `${labelFor(field)} saved. Verdict ${before} → ${after}.`
           : `${labelFor(field)} saved. Re-checked: still ${after}.`;

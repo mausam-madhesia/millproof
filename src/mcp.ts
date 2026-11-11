@@ -4,7 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CHEM_ELEMENTS, EDITABLE_PATHS, GAUGES, labelFor } from "./fields.js";
-import { createCertificate, getCertificate, listCertificates, supplierScorecard, updateField, Certificate } from "./repo.js";
+import { createCertificate, getCertificate, listCertificates, paymentStatus, supplierScorecard, updateField, Certificate } from "./repo.js";
 import { recordUrl, shareUrl } from "./config.js";
 import { supportedGradesText } from "./specs.js";
 import { CheckResult } from "./checker.js";
@@ -47,6 +47,7 @@ function summarise(c: Certificate): string {
   const bad = ck.results.filter((r) => r.status === "fail" || r.status === "missing" || r.status === "review");
   const lines = [
     `${c.id}: heat ${c.data.heat_number}, ${ck.specLabel}, supplier ${c.data.supplier}`,
+    `Payment status: ${paymentStatus(c.status)}.`,
     `Verdict: ${ck.verdict} (${ck.counts.pass} pass, ${ck.counts.fail} fail, ${ck.counts.missing} missing${ck.counts.review ? `, ${ck.counts.review} to review` : ""}). QA status: ${c.status}.`,
     ...bad.map((r) => `- ${r.status.toUpperCase()}: ${r.label} = ${r.value ?? "not given"} (limit ${r.limitText})${r.note ? `. ${r.note}` : ""}`),
     ...ck.flags.map((f) => `- RED FLAG: ${f.message}`),
@@ -61,6 +62,7 @@ function payload(c: Certificate) {
     id: c.id,
     verdict: c.check.verdict,
     qa_status: c.status,
+    payment_status: paymentStatus(c.status),
     spec: c.check.specLabel,
     counts: c.check.counts,
     record_url: recordUrl(c.id),
@@ -126,7 +128,7 @@ export function buildMcpServer(): McpServer {
     "list_certificates",
     {
       title: "List MTC records",
-      description: "List certificate records, newest first. Optionally filter by supplier (partial name match), verdict (PASS / FAIL / INCOMPLETE) or QA status (pending / approved / rejected).",
+      description: "List certificate records, newest first, with verdict, QA status and payment status (Awaiting QA / Cleared for payment / Payment on hold). Optionally filter by supplier (partial name match), verdict (PASS / FAIL / INCOMPLETE) or QA status (pending / approved / rejected).",
       inputSchema: {
         supplier: z.string().optional().describe("Supplier name or part of it."),
         verdict: z.enum(["PASS", "FAIL", "INCOMPLETE"]).optional(),
@@ -138,10 +140,10 @@ export function buildMcpServer(): McpServer {
       const list = await listCertificates({ supplier, verdict, status, limit: limit ?? 25 });
       const rows = list.map((c) => ({
         id: c.id, heat_number: c.data.heat_number, supplier: c.data.supplier, mill: c.data.mill_name, grade: c.check.specLabel,
-        verdict: c.check.verdict, qa_status: c.status, cert_date: c.data.cert_date, record_url: recordUrl(c.id),
+        verdict: c.check.verdict, qa_status: c.status, payment_status: paymentStatus(c.status), cert_date: c.data.cert_date, record_url: recordUrl(c.id),
       }));
       const text = rows.length
-        ? `${rows.length} certificate(s):\n` + rows.map((r) => `- ${r.id} | heat ${r.heat_number} | ${r.supplier} | ${r.grade} | ${r.verdict} | ${r.qa_status}`).join("\n")
+        ? `${rows.length} certificate(s):\n` + rows.map((r) => `- ${r.id} | heat ${r.heat_number} | ${r.supplier} | ${r.grade} | ${r.verdict} | ${r.qa_status} | ${r.payment_status}`).join("\n")
         : "No certificates match that filter.";
       return ok(text, rows);
     },
@@ -151,12 +153,12 @@ export function buildMcpServer(): McpServer {
     "get_certificate",
     {
       title: "Get MTC record",
-      description: "Get one certificate record with every value, its pass/fail/missing result, the limit and source clause used, red flags and QA decision. Accepts the record id (e.g. MTC-7QK2XA) or a heat number (returns the newest record for that heat).",
+      description: "Get one certificate record with every value, its pass/fail/missing/review result, the limit and source clause used, red flags, QA decision and payment status. Accepts the record id (e.g. MTC-7QK2XA) or a heat number (returns the newest record for that heat).",
       inputSchema: { id: z.string().min(1).describe("Record id like MTC-7QK2XA, or a heat number.") },
     },
     async ({ id }) => {
       const c = await getCertificate(id);
-      return c ? ok(summarise(c), payload(c)) : fail(`No certificate found for "${id}". Use list_certificates to see ids.`);
+      return c && c.status !== "deleted" ? ok(summarise(c), payload(c)) : fail(`No certificate found for "${id}". Use list_certificates to see ids.`);
     },
   );
 
@@ -175,11 +177,11 @@ export function buildMcpServer(): McpServer {
     async ({ id, field, value, reason }) => {
       try {
         const found = await getCertificate(id);
-        if (!found) return fail(`No certificate found for "${id}".`);
+        if (!found || found.status === "deleted") return fail(`No certificate found for "${id}".`);
         const { cert, changed, before } = await updateField(found.id, field, value, ACTOR, reason ?? null);
         const head = changed
           ? `Updated ${labelFor(field)} on ${cert.id}. Verdict ${before === cert.check.verdict ? `stays ${cert.check.verdict}` : `changed ${before} → ${cert.check.verdict}`}.`
-          : `No change: ${labelFor(field)} already had that value.`;
+          : `No change: ${labelFor(field)} already had that value. Results below are freshly re-checked.`;
         return ok(`${head}\n${summarise(cert)}`, payload(cert));
       } catch (e) {
         return fail(`Could not update: ${(e as Error).message}`);
@@ -191,7 +193,7 @@ export function buildMcpServer(): McpServer {
     "supplier_scorecard",
     {
       title: "Supplier scorecard",
-      description: "One supplier's certificate history: total certificates, pass rate (share of certificates with a PASS verdict), fails, incompletes, QA approvals/rejections, the fields that fail most often, and every certificate. Partial names match.",
+      description: "One supplier's certificate history: total certificates, pass rate (share of certificates with a PASS verdict), fails, incompletes, QA approvals/rejections, payment status counts (cleared / on hold / awaiting QA), the fields that fail most often, and every certificate. Partial names match.",
       inputSchema: { supplier: z.string().min(1).describe("Supplier name or part of it.") },
     },
     async ({ supplier }) => {
@@ -200,11 +202,12 @@ export function buildMcpServer(): McpServer {
       const text = [
         `${s.supplier}: ${s.total} certificate(s), pass rate ${(s.passRate * 100).toFixed(0)}% (${s.pass} pass, ${s.fail} fail, ${s.incomplete} incomplete).`,
         `QA decisions: ${s.approved} approved, ${s.rejected} rejected, ${s.pending} pending.`,
+        `Payment: ${s.payment.cleared} cleared for payment, ${s.payment.onHold} on hold, ${s.payment.awaitingQa} awaiting QA.`,
         s.topFailures.length ? `Most frequent failures: ${s.topFailures.map((f) => `${f.label} (${f.count})`).join(", ")}.` : "No failing fields on record.",
       ].join("\n");
       return ok(text, {
         ...s,
-        certificates: s.certificates.map((c) => ({ id: c.id, heat_number: c.data.heat_number, grade: c.check.specLabel, verdict: c.check.verdict, qa_status: c.status, record_url: recordUrl(c.id) })),
+        certificates: s.certificates.map((c) => ({ id: c.id, heat_number: c.data.heat_number, grade: c.check.specLabel, verdict: c.check.verdict, qa_status: c.status, payment_status: paymentStatus(c.status), record_url: recordUrl(c.id) })),
       });
     },
   );

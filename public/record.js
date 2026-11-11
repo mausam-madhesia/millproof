@@ -51,7 +51,8 @@
     input.classList.remove("error", "saved");
     input.classList.add("saving");
     try {
-      const resp = await post(`/api/certificates/${id}/fields`, { field, value });
+      const reasonEl = document.getElementById("edit-reason");
+      const resp = await post(`/api/certificates/${id}/fields`, { field, value, reason: reasonEl ? reasonEl.value : "" });
       input.setAttribute("data-saved", resp.value ?? "");
       input.value = resp.value ?? "";
       input.classList.remove("saving");
