@@ -23,6 +23,9 @@ export const config = {
   demoUser: process.env.DEMO_USER || "qa@millproof.demo",
   demoPassword: process.env.DEMO_PASSWORD || "MillProof@2026",
   demoName: process.env.DEMO_NAME || "Demo QA Engineer",
+  // Admin account: can delete records and reset demo data. In production it only works if ADMIN_PASSWORD is set.
+  adminUser: process.env.ADMIN_USER || "admin@millproof.demo",
+  adminPassword: process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "admin-dev-only"),
   sessionSecret: process.env.SESSION_SECRET || devFallback("SESSION_SECRET", randomBytes(32).toString("hex")),
   seedOnEmpty: (process.env.SEED_ON_EMPTY ?? "true") !== "false",
 };

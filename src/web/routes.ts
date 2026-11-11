@@ -1,8 +1,8 @@
 import express, { Router, Request, Response } from "express";
-import { checkCredentials, clearSession, currentUser, requireLogin, setSession } from "../auth.js";
+import { checkCredentials, clearSession, currentUser, displayName, isAdmin, requireAdmin, requireLogin, setSession } from "../auth.js";
 import { config } from "../config.js";
 import { getValue, labelFor } from "../fields.js";
-import { allScorecards, decide, resetAll, getByShareToken, getCertificate, getEvents, listCertificates, supplierScorecard, updateField } from "../repo.js";
+import { allScorecards, decide, deleteCertificate, resetAll, getByShareToken, getCertificate, getEvents, listCertificates, supplierScorecard, updateField } from "../repo.js";
 import { Verdict } from "../checker.js";
 import * as V from "./views.js";
 import { seed } from "../seed.js";
@@ -20,10 +20,11 @@ export function webRouter(): Router {
   });
   r.post("/login", (req, res) => {
     const { username = "", password = "", next } = req.body ?? {};
-    if (!checkCredentials(String(username), String(password))) {
+    const account = checkCredentials(String(username), String(password));
+    if (!account) {
       return res.status(401).send(V.loginPage("That email and password don't match the test account.", safeNext(next)));
     }
-    setSession(res, config.demoUser);
+    setSession(res, account);
     res.redirect(safeNext(next));
   });
   r.get("/logout", (_req, res) => {
@@ -56,7 +57,7 @@ export function webRouter(): Router {
     const c = await getCertificate(req.params.id);
     if (!c) return res.status(404).send(V.notFoundPage(user(req), "Certificate"));
     if (c.id !== req.params.id) return res.redirect(`/certificates/${c.id}`);
-    res.send(V.layout(`Heat ${c.data.heat_number}`, V.recordPage(c, await getEvents(c.id)), { user: user(req), active: "certs", scripts: ["/static/record.js"] }));
+    res.send(V.layout(`Heat ${c.data.heat_number}`, V.recordPage(c, await getEvents(c.id), isAdmin(user(req))), { user: user(req), active: "certs", scripts: ["/static/record.js"] }));
   });
 
   r.get("/suppliers", async (req, res) => {
@@ -69,13 +70,19 @@ export function webRouter(): Router {
   });
 
   r.get("/connect", (req, res) => {
-    res.send(V.layout("Connect Claude", V.connectPage(), { user: user(req), active: "connect" }));
+    res.send(V.layout("Connect Claude", V.connectPage(isAdmin(user(req))), { user: user(req), active: "connect" }));
   });
 
   // Wipe and reload the 6 sample certificates (handy between demo takes; Render's free tier has no shell).
-  r.post("/admin/reset-demo", async (_req, res) => {
+  r.post("/admin/reset-demo", requireAdmin, async (_req, res) => {
     await resetAll();
     await seed();
+    res.redirect("/");
+  });
+
+  // Admin only: permanently delete one record (e.g. test data) and its audit trail.
+  r.post("/certificates/:id/delete", requireAdmin, async (req, res) => {
+    await deleteCertificate(String(req.params.id));
     res.redirect("/");
   });
 
@@ -83,7 +90,7 @@ export function webRouter(): Router {
   r.post("/api/certificates/:id/fields", express.json(), async (req: Request, res: Response) => {
     try {
       const { field, value } = req.body ?? {};
-      const { cert, changed, before } = await updateField(String(req.params.id), String(field), value, config.demoName);
+      const { cert, changed, before } = await updateField(String(req.params.id), String(field), value, displayName(user(req)));
       const after = cert.check.verdict;
       const message = !changed
         ? "No change"
@@ -101,7 +108,7 @@ export function webRouter(): Router {
     try {
       const { decision, note } = req.body ?? {};
       if (decision !== "approved" && decision !== "rejected") throw new Error("Decision must be approved or rejected.");
-      const cert = await decide(String(req.params.id), decision, config.demoName, note);
+      const cert = await decide(String(req.params.id), decision, displayName(user(req)), note);
       res.json({ message: decision === "approved" ? "Batch approved" : "Batch rejected", ...V.recordUpdate(cert, await getEvents(cert.id)) });
     } catch (e) {
       res.status(400).json({ error: (e as Error).message });

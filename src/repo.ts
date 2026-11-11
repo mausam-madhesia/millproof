@@ -293,6 +293,18 @@ export async function supplierScorecard(name: string): Promise<Scorecard | null>
   return cards.find((c) => c.key === k) ?? cards.find((c) => c.key.includes(k) || k.includes(c.key)) ?? null;
 }
 
+/** Permanently delete a record and its audit trail. Returns false if it did not exist. */
+export async function deleteCertificate(id: string): Promise<boolean> {
+  const db = await getDb();
+  const found = await db.get<{ id: string }>("SELECT id FROM certificates WHERE id = ?", [id]);
+  if (!found) return false;
+  await db.tx(async (t) => {
+    await t.run("DELETE FROM events WHERE cert_id = ?", [id]);
+    await t.run("DELETE FROM certificates WHERE id = ?", [id]);
+  });
+  return true;
+}
+
 export async function countCertificates(): Promise<number> {
   const db = await getDb();
   const r = await db.get<{ n: number | string }>("SELECT COUNT(*) AS n FROM certificates");

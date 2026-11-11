@@ -5,6 +5,7 @@ import { FieldResult, CheckResult } from "../checker.js";
 import { CHEM_ELEMENTS, GAUGES, IDENTITY_FIELDS, IDENTITY_LABELS, MECH_FIELDS, getValue, labelFor } from "../fields.js";
 import { config, recordUrl, shareUrl } from "../config.js";
 import { EDITION_WARNING, SPECS } from "../specs.js";
+import { displayName } from "../auth.js";
 
 export const esc = (v: unknown): string =>
   String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -24,7 +25,10 @@ const VERDICT_TEXT: Record<string, string> = { PASS: "Pass", FAIL: "Fail", INCOM
 export const verdictBadge = (v: string, lg = false) => `<span class="badge ${v.toLowerCase()}${lg ? " lg" : ""}">${VERDICT_TEXT[v] ?? esc(v)}</span>`;
 export const statusBadge = (s: string, lg = false) =>
   `<span class="badge ${s}${lg ? " lg" : ""}">${s === "pending" ? "Awaiting QA" : s === "approved" ? "Approved" : "Rejected"}</span>`;
-const fieldBadge = (s: string) => (s === "info" ? `<span class="small muted">Recorded</span>` : `<span class="badge ${s}">${s === "missing" ? "Missing" : s === "pass" ? "Pass" : "Fail"}</span>`);
+const FIELD_TEXT: Record<string, string> = { pass: "Pass", fail: "Fail", missing: "Missing", review: "Review" };
+const fieldBadge = (s: string) => (s === "info" ? `<span class="small muted">Recorded</span>` : `<span class="badge ${s}">${FIELD_TEXT[s] ?? esc(s)}</span>`);
+const countsText = (k: { pass: number; fail: number; missing: number; review?: number }) =>
+  `${k.pass} pass, ${k.fail} fail, ${k.missing} missing${k.review ? `, ${k.review} to review` : ""}`;
 const sourceTag = (c: Certificate) => (c.source === "claude" ? `<span class="src-tag">via Claude</span>` : c.source === "seed" ? `<span class="src-tag" style="background:#f1f5f9;color:#475569">sample</span>` : "");
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">`;
@@ -40,7 +44,7 @@ export function layout(title: string, body: string, opts: { user: string; active
     .join("");
   return `${head(title)}<body>
 <header class="topbar"><div class="wrap"><a class="brand" href="/">${LOGO} MillProof</a><nav class="nav">${nav}</nav>
-<div class="who"><span>${esc(config.demoName)}</span><a href="/logout">Log out</a></div></div></header>
+<div class="who"><span>${esc(displayName(opts.user))}</span><a href="/logout">Log out</a></div></div></header>
 <main class="wrap">${body}</main><div id="toast" class="toast"></div>
 ${(opts.scripts ?? []).map((s) => `<script src="${s}" defer></script>`).join("")}
 </body></html>`;
@@ -137,7 +141,7 @@ export function headFragment(c: Certificate) {
 <h1>Heat <span class="mono">${esc(c.data.heat_number)}</span> <span class="muted" style="font-weight:400">· ${esc(ck.specLabel)}</span></h1>
 <div class="meta">${esc(c.data.supplier)}${c.data.mill_name ? ` · ${esc(c.data.mill_name)}` : ""} · ${c.source === "claude" ? "Sent in by Claude" : c.source === "seed" ? "Sample record" : "Added"} on ${fmtDateTime(c.created_at)} ${sourceTag(c)}</div>
 </div><div class="verdict-box">${verdictBadge(ck.verdict, true)}${statusBadge(c.status)}
-<div class="counts"><span><b>${ck.counts.pass}</b> pass</span><span><b>${ck.counts.fail}</b> fail</span><span><b>${ck.counts.missing}</b> missing</span></div></div></div>`;
+<div class="counts"><span><b>${ck.counts.pass}</b> pass</span><span><b>${ck.counts.fail}</b> fail</span><span><b>${ck.counts.missing}</b> missing</span>${ck.counts.review ? `<span><b>${ck.counts.review}</b> to review</span>` : ""}</div></div></div>`;
 }
 
 export function flagsFragment(c: Certificate) {
@@ -179,7 +183,7 @@ export function auditFragment(events: AuditEvent[]) {
   return `<section class="card" id="frag-audit"><div class="card-head"><h2>Audit trail</h2><span class="small muted">${events.length} event${events.length === 1 ? "" : "s"}</span></div><ul class="audit">${items}</ul></section>`;
 }
 
-export function recordPage(c: Certificate, events: AuditEvent[]) {
+export function recordPage(c: Certificate, events: AuditEvent[], admin = false) {
   const idRows = IDENTITY_FIELDS.map((f) => {
     const kind = f === "thickness_mm" ? "num" : f === "elongation_gauge" ? "gauge" : "text";
     return `<tr><td>${IDENTITY_LABELS[f]}</td><td>${inputFor(c, f, kind)}</td></tr>`;
@@ -198,6 +202,9 @@ ${resultsTable(c, "chemistry.", true)}</section>
 <section class="card"><div class="card-head"><h2>Mechanical properties</h2>${spec?.note ? `<span class="small muted" style="max-width:60%;text-align:right">${esc(spec.note)}</span>` : ""}</div>
 ${resultsTable(c, "mechanical.", true)}</section>
 ${auditFragment(events)}
+${admin ? `<section class="card" style="border-color:#f1b8b2"><div class="card-head"><h2>Delete record</h2><span class="small muted">Admin only · permanent</span></div>
+<div class="card-body"><p style="margin:0 0 12px">Removes this certificate and its audit trail for good. Use it for test data, not to hide a failed batch.</p>
+<form method="post" action="/certificates/${c.id}/delete" onsubmit="return confirm('Permanently delete heat ${esc(c.data.heat_number)} (${c.id}) and its audit trail? This cannot be undone.')"><button class="btn reject" type="submit">Delete record</button></form></div></section>` : ""}
 <p class="footer-note">Checks use fixed rules from the MillProof spec table. Limits tagged <span class="chip" style="margin:0">verify</span> are not yet confirmed against the licensed standard. ${esc(EDITION_WARNING)}</p>
 </div>`;
 }
@@ -232,7 +239,7 @@ export function sharePage(c: Certificate, editCount: number) {
 <table class="kv"><tbody>
 ${id("Heat number", c.data.heat_number)}${id("Supplier", c.data.supplier)}${id("Mill", c.data.mill_name)}${id("Standard / grade", `${c.data.standard} · ${c.data.grade}`)}
 ${id("Certificate no. / date", [c.data.certificate_no, c.data.cert_date ? fmtDate(c.data.cert_date) : null].filter(Boolean).join(" · "))}${id("Product", c.data.product)}
-${id("Result", `${ck.counts.pass} pass, ${ck.counts.fail} fail, ${ck.counts.missing} missing`)}
+${id("Result", countsText(ck.counts))}
 ${id("Record", `${c.id} · last checked ${fmtDateTime(ck.checkedAt)} · ${editCount} correction${editCount === 1 ? "" : "s"} on the audit trail`)}
 </tbody></table></div>
 ${ck.flags.length ? `<div class="flags" style="margin-top:20px"><h3>Red flags</h3><ul>${ck.flags.map((f) => `<li>${esc(f.message)}</li>`).join("")}</ul></div>` : ""}
@@ -276,7 +283,7 @@ ${s.topFailures.length ? `<div class="card"><div class="card-head"><h2>Most freq
 
 /* ---------- Connect Claude ---------- */
 
-export function connectPage() {
+export function connectPage(admin = false) {
   const url = `${config.publicUrl}/mcp?token=${config.mcpToken}`;
   const prompt = `Read the attached mill test certificate and add it to MillProof. The supplier is Vardhan Steel Traders. Tell me the verdict and anything that failed or is missing.`;
   return `<div class="page-head"><div><h1>Connect Claude</h1><div class="meta">Claude reads your certificates. MillProof stores, checks and shares them.</div></div></div>
@@ -296,8 +303,8 @@ export function connectPage() {
 <tr><td class="mono">update_certificate_field</td><td>Correct one value; the check re-runs</td></tr>
 <tr><td class="mono">supplier_scorecard</td><td>A supplier's pass rate and history</td></tr>
 </tbody></table><div class="card-body small muted">No AI runs inside MillProof. Claude, on your own Claude plan, reads the document; MillProof applies fixed rules from its spec table.</div></section></div>
-<section class="card" style="margin-top:20px"><div class="card-head"><h2>Demo data</h2><span class="small muted">Wipes every record and reloads the 6 samples</span></div>
-<div class="card-body"><form method="post" action="/admin/reset-demo" onsubmit="return confirm('Delete all certificates and reload the 6 samples?')"><button class="btn reject" type="submit">Reset demo data</button></form></div></section>
+${admin ? `<section class="card" style="margin-top:20px"><div class="card-head"><h2>Demo data</h2><span class="small muted">Wipes every record and reloads the 6 samples</span></div>
+<div class="card-body"><form method="post" action="/admin/reset-demo" onsubmit="return confirm('Delete all certificates and reload the 6 samples?')"><button class="btn reject" type="submit">Reset demo data</button></form></div></section>` : ""}
 <script>document.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{const t=document.getElementById(b.dataset.copy);try{await navigator.clipboard.writeText(t.value);b.textContent="Copied";}catch{t.select();}setTimeout(()=>b.textContent="Copy",1500);}));</script>`;
 }
 

@@ -1,5 +1,5 @@
 {
-  "_about": "MillProof spec table. Every limit carries a 'source' naming the standard, clause and table it comes from. Limits marked \"verify\": true are ones the author is NOT fully sure of (thickness bands, sub-quality limits, edition changes). Check each against your licensed copy of the standard before relying on it. Units: chemistry in weight %, strength in MPa, elongation in %. Rule shapes: {min,max} | {bands:[{upto_mm,min,max}]} (by product thickness; last band has no upto_mm) | {by_gauge:{gauge:{min}}, default_gauge}.",
+  "_about": "MillProof spec table. Every limit carries a 'source' naming the standard, clause and table it comes from. Limits marked \"verify\": true are ones the author is NOT fully sure of (thickness bands, sub-quality limits, edition changes). Check each against your licensed copy of the standard before relying on it. Units: chemistry in weight %, strength in MPa, elongation in %. Rule shapes: {min,max} | {bands:[{below_mm|upto_mm,min,max}]} (by product thickness: below_mm means thickness < value, upto_mm means thickness <= value; the last band has neither) | {by_edition:{2019+:{...}, pre-2019:{...}}} (ASTM edition read from the certificate's standard, e.g. A36/A36M-19) | {by_gauge:{gauge:{min}}, default_gauge}.",
   "_edition_warning": "IS 2062 values below are from IS 2062:2011. A BIS circular dated 16 Apr 2026 indicates an amendment that revises Table 1 (chemistry) and the mechanical-properties table for some grades. Confirm the edition your purchase orders cite.",
   "specs": [
     {
@@ -19,13 +19,13 @@
       "mechanical": {
         "yield_strength_mpa": {
           "bands": [
-            { "upto_mm": 20, "min": 250, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, thickness < 20 mm", "verify": false },
-            { "upto_mm": 40, "min": 240, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, 20-40 mm", "verify": true },
-            { "min": 230, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, > 40 mm", "verify": true }
+            { "below_mm": 20, "min": 250, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, thickness below 20 mm", "verify": false },
+            { "upto_mm": 40, "min": 240, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, 20 mm to 40 mm inclusive", "verify": true },
+            { "min": 230, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, over 40 mm", "verify": true }
           ]
         },
         "tensile_strength_mpa": { "min": 410, "source": "IS 2062:2011, Table 2 - Tensile strength min, E250", "verify": false },
-        "elongation_pct": { "min": 23, "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E250", "verify": false }
+        "elongation_pct": { "min": 23, "gauge": "proportional", "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E250", "verify": false }
       }
     },
     {
@@ -45,13 +45,13 @@
       "mechanical": {
         "yield_strength_mpa": {
           "bands": [
-            { "upto_mm": 20, "min": 250, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, thickness < 20 mm", "verify": false },
-            { "upto_mm": 40, "min": 240, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, 20-40 mm", "verify": true },
-            { "min": 230, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, > 40 mm", "verify": true }
+            { "below_mm": 20, "min": 250, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, thickness below 20 mm", "verify": false },
+            { "upto_mm": 40, "min": 240, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, 20 mm to 40 mm inclusive", "verify": true },
+            { "min": 230, "source": "IS 2062:2011, Table 2 - Yield stress min, E250, over 40 mm", "verify": true }
           ]
         },
         "tensile_strength_mpa": { "min": 410, "source": "IS 2062:2011, Table 2 - Tensile strength min, E250", "verify": false },
-        "elongation_pct": { "min": 23, "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E250", "verify": false }
+        "elongation_pct": { "min": 23, "gauge": "proportional", "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E250", "verify": false }
       }
     },
     {
@@ -71,21 +71,21 @@
       "mechanical": {
         "yield_strength_mpa": {
           "bands": [
-            { "upto_mm": 20, "min": 350, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, thickness < 20 mm", "verify": false },
-            { "upto_mm": 40, "min": 330, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, 20-40 mm", "verify": true },
-            { "min": 320, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, > 40 mm", "verify": true }
+            { "below_mm": 20, "min": 350, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, thickness below 20 mm", "verify": false },
+            { "upto_mm": 40, "min": 330, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, 20 mm to 40 mm inclusive", "verify": true },
+            { "min": 320, "source": "IS 2062:2011, Table 2 - Yield stress min, E350, over 40 mm", "verify": true }
           ]
         },
         "tensile_strength_mpa": { "min": 490, "source": "IS 2062:2011, Table 2 - Tensile strength min, E350", "verify": false },
-        "elongation_pct": { "min": 22, "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E350", "verify": false }
+        "elongation_pct": { "min": 22, "gauge": "proportional", "source": "IS 2062:2011, Table 2 - Elongation min on 5.65 sqrt(So) gauge, E350", "verify": false }
       }
     },
     {
       "id": "ASTM-A36",
       "label": "ASTM A36/A36M (plates)",
-      "standard": "ASTM A36/A36M-19",
+      "standard": "ASTM A36/A36M",
       "match": { "standard": "A36", "grade": "^((ASTM|ASME)?S?A36(A36M)?(19)?)?$" },
-      "note": "Limits are for plates. Shapes and bars have different chemistry columns. Strength values are in MPa: if the MTC is in ksi, 1 ksi = 6.895 MPa.",
+      "note": "Limits are for plates. Shapes and bars have different chemistry columns. P and S limits depend on the edition printed on the certificate (A36-19 or later vs A36-14 or earlier); if no edition is printed, the current A36-19 limits are used. Strength values are in MPa: if the MTC is in ksi, 1 ksi = 6.895 MPa.",
       "chemistry": {
         "C": {
           "bands": [
@@ -104,8 +104,18 @@
             { "min": 0.85, "max": 1.20, "source": "ASTM A36/A36M-19, Sec. 7, Chemical Requirements table - Mn range, plates over 65 mm", "verify": true }
           ]
         },
-        "P":  { "max": 0.030, "source": "ASTM A36/A36M-19, Sec. 7, Chemical Requirements table - Phosphorus max. Editions up to A36-14 allowed 0.04", "verify": true },
-        "S":  { "max": 0.030, "source": "ASTM A36/A36M-19, Sec. 7, Chemical Requirements table - Sulfur max. Editions up to A36-14 allowed 0.05", "verify": true },
+        "P": {
+          "by_edition": {
+            "2019+":    { "max": 0.030, "source": "ASTM A36/A36M-19 (and later), Sec. 7, Chemical Requirements table - Phosphorus max", "verify": false },
+            "pre-2019": { "max": 0.04,  "source": "ASTM A36/A36M-14 (and earlier), Sec. 7, Chemical Requirements table - Phosphorus max", "verify": false }
+          }
+        },
+        "S": {
+          "by_edition": {
+            "2019+":    { "max": 0.030, "source": "ASTM A36/A36M-19 (and later), Sec. 7, Chemical Requirements table - Sulfur max", "verify": false },
+            "pre-2019": { "max": 0.05,  "source": "ASTM A36/A36M-14 (and earlier), Sec. 7, Chemical Requirements table - Sulfur max", "verify": false }
+          }
+        },
         "Si": { "max": 0.40, "required": false, "source": "ASTM A36/A36M-19, Sec. 7, Chemical Requirements table - Silicon max, plates to 40 mm (0.15-0.40 above 40 mm)", "verify": true }
       },
       "mechanical": {

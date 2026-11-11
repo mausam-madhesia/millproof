@@ -27,6 +27,10 @@ services:
         value: MillProof@2026
       - key: DEMO_NAME
         value: Demo QA Engineer
+      - key: ADMIN_USER
+        value: admin@millproof.demo
+      - key: ADMIN_PASSWORD
+        generateValue: true
 databases:
   - name: millproof-db
     plan: free

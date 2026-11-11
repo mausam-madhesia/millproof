@@ -4,7 +4,7 @@ Total: 5:00. Spoken lines are written for about 140 words a minute. **[On screen
 
 ## Before you hit record
 
-- [ ] Open the live app and click **Connect Claude → Reset demo data** (you get exactly 6 sample records).
+- [ ] Log in to the live app **as admin**, click **Connect Claude → Reset demo data** (you get exactly 6 sample records), then log out and log back in as `qa@millproof.demo` for the recording.
 - [ ] Stay logged in to the app in one browser tab. Open a **private/incognito window** for the share link.
 - [ ] In Claude, connect the MillProof connector and turn it on. Start a **fresh chat**.
 - [ ] Have `sample/SAMPLE_MTC_RK24-3561_photo.jpg` ready to drag in.

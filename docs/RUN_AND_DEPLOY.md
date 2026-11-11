@@ -13,7 +13,17 @@ npm run dev                   # builds, then starts on http://localhost:3000
 
 - Open http://localhost:3000 and log in with `qa@millproof.demo` / `MillProof@2026`.
 - On first start the 6 sample certificates load automatically into a local SQLite file at `./data/millproof.db`.
-- Reset the sample data at any time with `npm run seed -- --reset`, or the **Reset demo data** button on the Connect Claude page.
+- Reset the sample data at any time with `npm run seed -- --reset`, or (logged in as admin) the **Reset demo data** button on the Connect Claude page.
+
+### Unit tests for the rules engine
+
+```bash
+npm test                     # expected: "# pass 39" and "# fail 0"
+```
+
+### Admin account
+
+A second login, `admin@millproof.demo`, can **delete records** (a "Delete record" card at the bottom of each record) and **reset demo data**. The test account cannot. Locally its password is `admin-dev-only` (or whatever you set as `ADMIN_PASSWORD` in `.env`). On Render the Blueprint generates `ADMIN_PASSWORD`: find it under web service → **Environment**. Without `ADMIN_PASSWORD` in production, the admin login is switched off.
 
 ### Prove every MCP tool works (no Claude needed)
 
@@ -105,7 +115,7 @@ Render's free web services have an **ephemeral filesystem**: a local SQLite file
 ```bash
 BASE_URL=https://millproof-xxxx.onrender.com MCP_TOKEN=<token> npm run smoke
 ```
-After that, click **Reset demo data** on the Connect Claude page so the smoke-test record doesn't show up in your video.
+After that, log in as admin and click **Reset demo data** on the Connect Claude page so the smoke-test record doesn't show up in your video.
 
 ## 3. Connect the live app to Claude
 

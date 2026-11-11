@@ -4,7 +4,8 @@
 import { CertData, CHEM_ELEMENTS, MECH_FIELDS, labelFor } from "./fields.js";
 import { Rule, Spec, resolveSpec } from "./specs.js";
 
-export type FieldStatus = "pass" | "fail" | "missing" | "info";
+/** review = a value is present but cannot be judged against this limit (e.g. elongation on a different gauge length). */
+export type FieldStatus = "pass" | "fail" | "missing" | "review" | "info";
 export type Verdict = "PASS" | "FAIL" | "INCOMPLETE";
 
 export interface FieldResult {
@@ -28,7 +29,7 @@ export interface CheckResult {
   specLabel: string;
   standard: string;
   verdict: Verdict;
-  counts: { pass: number; fail: number; missing: number };
+  counts: { pass: number; fail: number; missing: number; review: number };
   results: FieldResult[];
   flags: Flag[];
   checkedAt: string;
@@ -51,8 +52,18 @@ function fmtLimit(min: number | null, max: number | null, unit: string): string 
   return "No limit";
 }
 
-/** Pick the concrete limit that applies (by thickness band or gauge). */
-function effectiveLimit(rule: Rule, d: CertData): { min: number | null; max: number | null; source: string | null; verify: boolean; note?: string } {
+/** ASTM edition from the standard as printed, e.g. "ASTM A36/A36M-19" -> 2019. Null if no edition is printed. */
+export function astmEditionYear(standard: string | null | undefined): number | null {
+  const m = (standard ?? "").toUpperCase().replace(/\s+/g, "").match(/A36(?:\/A36M)?[-–](\d{2,4})/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return m[1].length === 4 ? n : n < 50 ? 2000 + n : 1900 + n;
+}
+
+interface Effective { min: number | null; max: number | null; source: string | null; verify: boolean; note?: string; review?: string }
+
+/** Pick the concrete limit that applies (by thickness band, edition or gauge). */
+export function effectiveLimit(rule: Rule, d: CertData): Effective {
   if (rule.bands) {
     const t = d.thickness_mm;
     let band = rule.bands[0];
@@ -60,21 +71,46 @@ function effectiveLimit(rule: Rule, d: CertData): { min: number | null; max: num
     if (t == null) {
       note = "Thickness not given, so the thinnest-product band was used.";
     } else {
-      band = rule.bands.find((b) => b.upto_mm == null || t <= b.upto_mm) ?? rule.bands[rule.bands.length - 1];
+      // below_mm: thickness < value (exclusive). upto_mm: thickness <= value (inclusive). Neither: catch-all.
+      band =
+        rule.bands.find((b) => (b.below_mm != null ? t < b.below_mm : b.upto_mm != null ? t <= b.upto_mm : true)) ??
+        rule.bands[rule.bands.length - 1];
       const i = rule.bands.indexOf(band);
-      const lower = i > 0 ? rule.bands[i - 1].upto_mm : 0;
-      note = band.upto_mm != null ? `Band for ${lower}–${band.upto_mm} mm (product is ${t} mm).` : `Band for over ${lower} mm (product is ${t} mm).`;
+      const prev = i > 0 ? rule.bands[i - 1] : null;
+      const lowerVal = prev ? (prev.below_mm ?? prev.upto_mm) : null;
+      const lowerTxt = prev == null ? "" : prev.below_mm != null ? `${lowerVal} mm (incl.)` : `over ${lowerVal} mm`;
+      const upperTxt = band.below_mm != null ? `below ${band.below_mm} mm` : band.upto_mm != null ? `up to ${band.upto_mm} mm (incl.)` : "";
+      const range = prev == null ? upperTxt : upperTxt ? `${lowerTxt} to ${upperTxt.replace("up to ", "")}` : lowerTxt.startsWith("over") ? lowerTxt : `${lowerVal} mm and over`;
+      note = `Thickness band: ${range}; product is ${t} mm.`;
     }
     return { min: band.min ?? null, max: band.max ?? null, source: band.source, verify: band.verify, note };
   }
-  if (rule.by_gauge) {
-    const g = d.elongation_gauge && rule.by_gauge[d.elongation_gauge] ? d.elongation_gauge : rule.default_gauge!;
-    const lim = rule.by_gauge[g];
-    const note = d.elongation_gauge && rule.by_gauge[d.elongation_gauge] ? `Gauge length ${g}.` : `Gauge not given, so ${g} was assumed.`;
+  if (rule.by_edition) {
+    const year = astmEditionYear(d.standard);
+    const key = year == null || year >= 2019 ? "2019+" : "pre-2019";
+    const lim = rule.by_edition[key];
+    const note = year == null ? "No edition printed on the certificate, so the current A36-19 limit was used." : `Edition ${year} printed on the certificate.`;
     return { min: lim.min ?? null, max: lim.max ?? null, source: lim.source, verify: lim.verify, note };
   }
-  return { min: rule.min ?? null, max: rule.max ?? null, source: rule.source ?? null, verify: !!rule.verify };
+  if (rule.by_gauge) {
+    const g = d.elongation_gauge;
+    if (g && !rule.by_gauge[g]) {
+      const lim = rule.by_gauge[rule.default_gauge!];
+      return { min: lim.min ?? null, max: lim.max ?? null, source: lim.source, verify: lim.verify, review: `Certificate reports elongation on a ${g === "proportional" ? "5.65√So" : g} gauge; the spec gives limits only for ${Object.keys(rule.by_gauge).join(" and ")} gauges. Check manually or ask the mill for a result on the right gauge.` };
+    }
+    const use = g ?? rule.default_gauge!;
+    const lim = rule.by_gauge[use];
+    const note = g ? `Gauge length ${use}.` : `Gauge not given, so ${use} was assumed.`;
+    return { min: lim.min ?? null, max: lim.max ?? null, source: lim.source, verify: lim.verify, note };
+  }
+  const base: Effective = { min: rule.min ?? null, max: rule.max ?? null, source: rule.source ?? null, verify: !!rule.verify };
+  if (rule.gauge && d.elongation_gauge && d.elongation_gauge !== rule.gauge) {
+    base.review = `Certificate reports elongation on a ${d.elongation_gauge} gauge, but this limit is for the 5.65√So proportional gauge. The two are not comparable; check manually or ask the mill for a proportional-gauge result.`;
+  }
+  return base;
 }
+
+const within = (v: number, min: number | null, max: number | null) => (min == null || v >= min) && (max == null || v <= max);
 
 function evaluate(field: string, value: number | null, rule: Rule | undefined, d: CertData, unit: string): FieldResult {
   const label = labelFor(field);
@@ -85,8 +121,8 @@ function evaluate(field: string, value: number | null, rule: Rule | undefined, d
   const base = { field, label, value, min: lim.min, max: lim.max, limitText: fmtLimit(lim.min, lim.max, unit), source: lim.source, verify: lim.verify, note: lim.note };
   if (lim.min == null && lim.max == null) return { ...base, status: "info" };
   if (value == null) return { ...base, status: rule.required === false ? "info" : "missing" };
-  const ok = (lim.min == null || value >= lim.min) && (lim.max == null || value <= lim.max);
-  return { ...base, status: ok ? "pass" : "fail" };
+  if (lim.review) return { ...base, status: "review", note: lim.review };
+  return { ...base, status: within(value, lim.min, lim.max) ? "pass" : "fail" };
 }
 
 export function checkCertificate(d: CertData, duplicates: { id: string; sameChemistry: boolean }[] = []): CheckResult {
@@ -100,19 +136,21 @@ export function checkCertificate(d: CertData, duplicates: { id: string; sameChem
     const rule = spec.chemistry[el];
     const value = d.chemistry[el] ?? null;
     if (el === "CE" && rule) {
-      // Judge CE on the reported value if present, otherwise on the calculated value.
-      if (value != null) {
-        results.push(evaluate("chemistry.CE", value, rule, d, ""));
-      } else {
-        const r = evaluate("chemistry.CE", ceCalc, rule, d, "");
-        r.value = null;
-        if (ceCalc != null) {
-          const ok = (r.min == null || ceCalc >= r.min) && (r.max == null || ceCalc <= r.max);
-          r.status = ok ? "pass" : "fail";
+      // Reported CE is judged as printed, unless it disagrees with the CE calculated from the chemistry
+      // by more than 0.02: then the higher of the two is judged. If CE is not printed, the calculated CE is judged.
+      const r = evaluate("chemistry.CE", value ?? ceCalc, rule, d, "");
+      r.value = value;
+      if (r.status === "pass" || r.status === "fail" || r.status === "missing") {
+        if (value == null && ceCalc != null) {
+          r.status = within(ceCalc, r.min, r.max) ? "pass" : "fail";
           r.note = `Not printed on the certificate; judged on the calculated CE ${ceCalc.toFixed(3)}.`;
+        } else if (value != null && ceCalc != null && Math.abs(value - ceCalc) > 0.02) {
+          const judged = Math.max(value, ceCalc);
+          r.status = within(judged, r.min, r.max) ? "pass" : "fail";
+          r.note = `Reported ${value} and calculated ${ceCalc.toFixed(3)} differ by more than 0.02, so the higher value (${judged === value ? value : judged.toFixed(3)}) was judged.`;
         }
-        results.push(r);
       }
+      results.push(r);
       continue;
     }
     results.push(evaluate(`chemistry.${el}`, value, rule, d, ""));
@@ -154,13 +192,15 @@ export function checkCertificate(d: CertData, duplicates: { id: string; sameChem
     });
   }
 
-  const counts = { pass: 0, fail: 0, missing: 0 };
+  const counts = { pass: 0, fail: 0, missing: 0, review: 0 };
   for (const r of results) {
     if (r.status === "pass") counts.pass++;
     else if (r.status === "fail") counts.fail++;
     else if (r.status === "missing") counts.missing++;
+    else if (r.status === "review") counts.review++;
   }
-  const verdict: Verdict = counts.fail > 0 ? "FAIL" : counts.missing > 0 ? "INCOMPLETE" : "PASS";
+  // A value that needs manual review blocks PASS just like a missing one.
+  const verdict: Verdict = counts.fail > 0 ? "FAIL" : counts.missing + counts.review > 0 ? "INCOMPLETE" : "PASS";
 
   return { specId: spec.id, specLabel: spec.label, standard: spec.standard, verdict, counts, results, flags, checkedAt: new Date().toISOString() };
 }

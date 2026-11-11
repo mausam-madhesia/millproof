@@ -9,6 +9,9 @@ export interface Limit {
   verify: boolean;
 }
 export interface BandLimit extends Partial<Limit> {
+  /** Band applies when thickness < below_mm (exclusive upper bound). */
+  below_mm?: number;
+  /** Band applies when thickness <= upto_mm (inclusive upper bound). */
   upto_mm?: number;
   source: string;
   verify: boolean;
@@ -21,6 +24,10 @@ export interface Rule {
   required?: boolean;
   bands?: BandLimit[];
   by_gauge?: Record<string, Limit>;
+  /** Gauge length a single elongation limit applies to; a different reported gauge needs manual review. */
+  gauge?: string;
+  /** Limits by standard edition: "2019+" (A36-19 or later) and "pre-2019" (A36-14 or earlier). */
+  by_edition?: Record<"2019+" | "pre-2019", Limit>;
   default_gauge?: string;
 }
 export interface Spec {

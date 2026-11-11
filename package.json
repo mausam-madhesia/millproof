@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "test": "tsc -p tsconfig.json && node --test dist/tests/*.test.js",
     "dev": "tsc -p tsconfig.json && node --env-file-if-exists=.env dist/server.js",
     "seed": "node --env-file-if-exists=.env dist/seed-cli.js",
     "smoke": "node --env-file-if-exists=.env dist/smoke-test.js",

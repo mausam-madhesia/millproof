@@ -35,18 +35,19 @@ What to extract:
 - certificate_no, cert_date (YYYY-MM-DD), product (e.g. 'HR plate 16 x 2000 x 6300 mm'), thickness_mm (number; drives thickness-dependent limits).
 - chemistry: heat/ladle analysis in weight %. Use null for elements not printed. Never guess or fill in typical values.
 - mechanical: yield_strength_mpa (YS / ReH / Rp0.2 / yield point), tensile_strength_mpa (UTS / Rm), elongation_pct (A% / El%). Strength must be in MPa (N/mm²); convert ksi x 6.895, psi x 0.006895. If several test pieces are listed, use the LOWEST yield and tensile values and the LOWEST elongation.
-- elongation_gauge: "proportional" (5.65√So, usual for IS 2062), "50mm" (2 in) or "200mm" (8 in).
+- elongation_gauge: "proportional" (5.65√So, usual for IS 2062), "50mm" (2 in) or "200mm" (8 in). Report the gauge actually printed; a gauge that doesn't match the spec is flagged for review, not converted.
+- For ASTM, keep the edition in standard (e.g. "ASTM A36/A36M-14"): P and S limits depend on it.
 
 If a value is unreadable, send null and tell the user which one; a QA engineer can fill it in the MillProof web app.
 
-MillProof then checks every value against the spec table with fixed rules (no AI) and returns pass / fail / missing per field, an overall verdict (PASS, FAIL or INCOMPLETE), red flags (e.g. reported CE doesn't match the chemistry, repeated heat number), a link to the record for QA review and a public verification link. Report the verdict and any failing or missing fields to the user, and give them the record link.`;
+MillProof then checks every value against the spec table with fixed rules (no AI) and returns pass / fail / missing / review per field (review = present but not comparable, e.g. elongation on a different gauge length), an overall verdict (PASS, FAIL or INCOMPLETE), red flags (e.g. reported CE doesn't match the chemistry, repeated heat number), a link to the record for QA review and a public verification link. Report the verdict and any failing or missing fields to the user, and give them the record link.`;
 
 function summarise(c: Certificate): string {
   const ck: CheckResult = c.check;
-  const bad = ck.results.filter((r) => r.status === "fail" || r.status === "missing");
+  const bad = ck.results.filter((r) => r.status === "fail" || r.status === "missing" || r.status === "review");
   const lines = [
     `${c.id}: heat ${c.data.heat_number}, ${ck.specLabel}, supplier ${c.data.supplier}`,
-    `Verdict: ${ck.verdict} (${ck.counts.pass} pass, ${ck.counts.fail} fail, ${ck.counts.missing} missing). QA status: ${c.status}.`,
+    `Verdict: ${ck.verdict} (${ck.counts.pass} pass, ${ck.counts.fail} fail, ${ck.counts.missing} missing${ck.counts.review ? `, ${ck.counts.review} to review` : ""}). QA status: ${c.status}.`,
     ...bad.map((r) => `- ${r.status.toUpperCase()}: ${r.label} = ${r.value ?? "not given"} (limit ${r.limitText})${r.note ? `. ${r.note}` : ""}`),
     ...ck.flags.map((f) => `- RED FLAG: ${f.message}`),
     `Record (QA review and edit): ${recordUrl(c.id)}`,

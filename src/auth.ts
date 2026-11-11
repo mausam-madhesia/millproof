@@ -23,8 +23,25 @@ function readCookie(req: Request, name: string): string | null {
   return null;
 }
 
-export function checkCredentials(user: string, password: string): boolean {
-  return safeEqual(user.trim().toLowerCase(), config.demoUser.toLowerCase()) && safeEqual(password, config.demoPassword);
+/** Returns the account email if the credentials match the test account or the admin account. */
+export function checkCredentials(user: string, password: string): string | null {
+  const u = user.trim().toLowerCase();
+  if (safeEqual(u, config.demoUser.toLowerCase()) && safeEqual(password, config.demoPassword)) return config.demoUser;
+  if (config.adminPassword && safeEqual(u, config.adminUser.toLowerCase()) && safeEqual(password, config.adminPassword)) return config.adminUser;
+  return null;
+}
+
+export function isAdmin(user: string | null): boolean {
+  return !!user && !!config.adminPassword && user.toLowerCase() === config.adminUser.toLowerCase();
+}
+
+export function displayName(user: string | null): string {
+  return isAdmin(user) ? "Admin" : config.demoName;
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (isAdmin(currentUser(req))) return next();
+  res.status(403).send("Only the admin account can do this.");
 }
 
 export function setSession(res: Response, user: string) {

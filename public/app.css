@@ -179,3 +179,4 @@ pre.prompt { background: var(--bg); border: 1px solid var(--line); border-radius
 .toast.err { background: var(--fail); }
 
 .nowrap { white-space: nowrap; }
+.badge.review { color: #5b21b6; background: #efe9fe; }
